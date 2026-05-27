@@ -92,6 +92,8 @@ th.r,td.r{text-align:right}
 .btn-delete{background:#fff;color:#e74c3c;border:1px solid #fde;padding:9px 20px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:500;transition:all .15s}
 .btn-delete:hover{background:#fff5f5;border-color:#e74c3c}
 .empty-state{text-align:center;padding:40px 0;color:#bbb;font-size:13px}
+.toast{position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#534AB7;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:2000;opacity:0;transition:opacity .3s;pointer-events:none;box-shadow:0 4px 12px rgba(83,74,183,.3)}
+.toast.show{opacity:1}
 </style>
 </head>
 <body>
@@ -593,6 +595,11 @@ function submitForm() {
     data.push(record);
     recalcBalances(data, data.length - 1);
     setData(data);
+    
+    // ===== LINKED: 系统账户取出 → 小金罐收入 =====
+    if (currentModule === 'system' && type === '支出') {
+      linkSysWithdrawToHand(record);
+    }
   }
   
   closeModal();
@@ -609,10 +616,16 @@ function deleteRecord() {
   const idx = data.findIndex(d => d.id === editingId);
   if (idx === -1) return;
   
+  const deletedRecord = data[idx];
   data.splice(idx, 1);
   // Recalculate all balances from the deleted position onward
   if (data.length > 0) recalcBalances(data, Math.min(idx, data.length - 1));
   setData(data);
+  
+  // ===== LINKED: 删除系统账户取出 → 询问同步删除小金罐收入 =====
+  if (currentModule === 'system' && deletedRecord.type === '支出') {
+    unlinkSysWithdrawFromHand(deletedRecord.id);
+  }
   
   closeModal();
   renderAll();
@@ -632,6 +645,48 @@ function recalcBalances(data, fromIdx) {
 document.getElementById('modalOverlay').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeModal();
 });
+
+// ===== TOAST =====
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ===== LINKED LOGIC: 系统账户取出 ↔ 小金罐收入 =====
+// When a "取出" record is added to sys, auto-add a matching "收入" to hand
+function linkSysWithdrawToHand(sysRecord) {
+  const newId = handData.length ? Math.max(...handData.map(d=>d.id)) + 1 : 1;
+  const linkedRecord = {
+    id: newId,
+    type: '收入',
+    desc: '系统账户取出：' + sysRecord.desc,
+    person: 'allenlxshen',
+    amount: sysRecord.amount,
+    date: sysRecord.date,
+    balance: 0,
+    linkedSysId: sysRecord.id // track origin
+  };
+  handData.push(linkedRecord);
+  recalcBalances(handData, handData.length - 1);
+  saveData(STORAGE_KEY_HAND, handData);
+  showToast('已同步到小金罐 +¥' + fmt(sysRecord.amount));
+}
+
+// When a sys "取出" record is deleted, ask whether to remove linked hand record
+function unlinkSysWithdrawFromHand(sysId) {
+  const linkedIdx = handData.findIndex(d => d.linkedSysId === sysId);
+  if (linkedIdx !== -1) {
+    if (confirm('系统账户取出已删除，是否同时删除小金罐中的对应收入记录？')) {
+      handData.splice(linkedIdx, 1);
+      if (handData.length > 0) recalcBalances(handData, Math.min(linkedIdx, handData.length - 1));
+      saveData(STORAGE_KEY_HAND, handData);
+      showToast('小金罐对应记录已同步删除');
+    }
+  }
+}
 
 // ===== INIT =====
 renderAll();
