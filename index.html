@@ -39,6 +39,9 @@ th{text-align:left;padding:12px 10px;font-weight:500;color:#999;border-bottom:1p
 td{padding:12px 10px;border-bottom:1px solid #f8f8f8;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:#fafafa}
+.row-edit{opacity:0;width:24px;height:24px;border-radius:6px;border:none;background:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;color:#bbb;font-size:14px}
+tr:hover .row-edit{opacity:1}
+.row-edit:hover{background:#f0ecff;color:#534AB7}
 .type-tag{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:500}
 .type-in{background:#e8f8f2;color:#0F6E56}
 .type-out{background:#fef0eb;color:#c0392b}
@@ -69,6 +72,8 @@ th.r,td.r{text-align:right}
 .btn-cancel:hover{background:#eee}
 .btn-submit{background:#534AB7;color:#fff}
 .btn-submit:hover{background:#4339a0}
+.btn-delete{background:#fff;color:#e74c3c;border:1px solid #fde;padding:9px 20px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:500;transition:all .15s}
+.btn-delete:hover{background:#fff5f5;border-color:#e74c3c}
 .empty-state{text-align:center;padding:40px 0;color:#bbb;font-size:13px}
 </style>
 </head>
@@ -132,8 +137,10 @@ th.r,td.r{text-align:right}
       <input type="text" id="formBalance" readonly>
     </div>
     <div class="form-actions">
+      <button class="btn-delete" id="btnDelete" onclick="deleteRecord()" style="display:none">删除此条</button>
+      <div style="flex:1"></div>
       <button class="btn-cancel" onclick="closeModal()">取消</button>
-      <button class="btn-submit" onclick="submitForm()">确认添加</button>
+      <button class="btn-submit" id="btnSubmit" onclick="submitForm()">确认添加</button>
     </div>
   </div>
 </div>
@@ -192,7 +199,15 @@ const DEFAULT_SYS = [
 {id:10,type:"收入",desc:"2024年10月经费",amount:1875,date:"2025-01-17",balance:1875},
 {id:11,type:"收入",desc:"2024年11月经费",amount:1800,date:"2025-01-17",balance:3675},
 {id:12,type:"收入",desc:"24年12月-25年9月经费+激励",amount:28935.60,date:"2025-11-04",balance:30735.60},
-{id:13,type:"支出",desc:"25年团建经费下发",amount:30735.60,date:"2025-11-14",balance:0}
+{id:13,type:"支出",desc:"25年团建经费下发",amount:30735.60,date:"2025-11-14",balance:0},
+{id:14,type:"收入",desc:"经费发放",amount:4800,date:"2025-12-20",balance:4800},
+{id:15,type:"收入",desc:"奖金注入",amount:2000,date:"2026-01-20",balance:6800},
+{id:16,type:"收入",desc:"经费发放",amount:4800,date:"2026-01-20",balance:11600},
+{id:17,type:"收入",desc:"经费发放",amount:4500,date:"2026-02-20",balance:16100},
+{id:18,type:"收入",desc:"经费发放",amount:4500,date:"2026-03-01",balance:20600},
+{id:19,type:"收入",desc:"调拨转入",amount:4200,date:"2026-03-20",balance:24800},
+{id:20,type:"收入",desc:"奖金注入",amount:2872.04,date:"2026-03-20",balance:27672.04},
+{id:21,type:"收入",desc:"经费发放",amount:4500,date:"2026-04-20",balance:32172.04}
 ];
 
 function loadData(key, defaults) {
@@ -277,8 +292,8 @@ function renderFilterTabs() {
 
 function renderTableHead() {
   const cols = currentModule === 'hand'
-    ? `<tr><th style="width:36px">#</th><th style="width:52px">类型</th><th style="min-width:150px">说明</th><th style="width:80px">负责人</th><th class="r" style="width:95px">金额</th><th style="width:85px">时间</th><th class="r" style="width:95px">余额</th></tr>`
-    : `<tr><th style="width:36px">#</th><th style="width:52px">类型</th><th style="min-width:180px">备注</th><th class="r" style="width:100px">金额</th><th style="width:90px">时间</th><th class="r" style="width:110px">系统内余额</th></tr>`;
+    ? `<tr><th style="width:36px">#</th><th style="width:52px">类型</th><th style="min-width:150px">说明</th><th style="width:80px">负责人</th><th class="r" style="width:95px">金额</th><th style="width:85px">时间</th><th class="r" style="width:95px">余额</th><th style="width:32px"></th></tr>`
+    : `<tr><th style="width:36px">#</th><th style="width:52px">类型</th><th style="min-width:180px">备注</th><th class="r" style="width:100px">金额</th><th style="width:90px">时间</th><th class="r" style="width:110px">系统内余额</th><th style="width:32px"></th></tr>`;
   document.getElementById('thead').innerHTML = cols;
 }
 
@@ -299,7 +314,7 @@ function renderTable() {
   
   let html = '';
   if (pageData.length === 0) {
-    const colSpan = currentModule === 'hand' ? 7 : 6;
+    const colSpan = currentModule === 'hand' ? 8 : 7;
     html = `<tr><td colspan="${colSpan}" class="empty-state">暂无记录</td></tr>`;
   } else {
     pageData.forEach(d => {
@@ -319,6 +334,7 @@ function renderTable() {
           <td class="r ${amtClass}">${sign}${fmt(d.amount)}</td>
           <td>${fmtDate(d.date)}</td>
           <td class="r" style="color:${d.balance>=0?'#0F6E56':'#c0392b'};font-weight:500">${d.balance<0?'-':''}¥${fmt(d.balance)}</td>
+          <td><button class="row-edit" onclick="openEdit(${d.id})" title="编辑">✎</button></td>
         </tr>`;
       } else {
         html += `<tr>
@@ -328,6 +344,7 @@ function renderTable() {
           <td class="r ${amtClass}">${sign}${fmt(d.amount)}</td>
           <td>${fmtDate(d.date)}</td>
           <td class="r" style="color:${d.balance>=0?'#0F6E56':'#c0392b'};font-weight:500">¥${fmt(d.balance)}</td>
+          <td><button class="row-edit" onclick="openEdit(${d.id})" title="编辑">✎</button></td>
         </tr>`;
       }
     });
@@ -381,7 +398,10 @@ document.getElementById('filterTabs').addEventListener('click', e => {
 });
 
 // ===== MODAL =====
+let editingId = null; // null = new record mode, number = editing mode
+
 function openModal() {
+  editingId = null;
   const overlay = document.getElementById('modalOverlay');
   overlay.classList.add('show');
   
@@ -405,6 +425,43 @@ function openModal() {
   calcBalance();
   
   document.getElementById('modalTitle').textContent = currentModule === 'hand' ? '新增小金罐记录' : '新增系统账户记录';
+  document.getElementById('btnSubmit').textContent = '确认添加';
+  document.getElementById('btnDelete').style.display = 'none';
+}
+
+function openEdit(id) {
+  editingId = id;
+  const data = getData();
+  const record = data.find(d => d.id === id);
+  if (!record) return;
+  
+  const overlay = document.getElementById('modalOverlay');
+  overlay.classList.add('show');
+  
+  const typeSelect = document.getElementById('formType');
+  if (currentModule === 'hand') {
+    typeSelect.innerHTML = '<option value="支出">支出</option><option value="收入">收入</option>';
+    document.getElementById('formDescLabel').textContent = '说明';
+    document.getElementById('formDesc').placeholder = '如：xxx生日（6人参加）';
+    document.getElementById('formPersonGroup').style.display = '';
+    document.getElementById('formPerson').value = record.person || '';
+  } else {
+    typeSelect.innerHTML = '<option value="收入">拨入（系统发放）</option><option value="支出">取出（提到手上）</option>';
+    document.getElementById('formDescLabel').textContent = '备注';
+    document.getElementById('formDesc').placeholder = '如：2025年10月经费';
+    document.getElementById('formPersonGroup').style.display = 'none';
+  }
+  
+  typeSelect.value = record.type;
+  document.getElementById('formDate').value = record.date;
+  document.getElementById('formDesc').value = record.desc;
+  document.getElementById('formAmount').value = record.amount;
+  
+  document.getElementById('formBalance').value = `¥${record.balance < 0 ? '-' : ''}${fmt(record.balance)}`;
+  
+  document.getElementById('modalTitle').textContent = '编辑记录 #' + id;
+  document.getElementById('btnSubmit').textContent = '保存修改';
+  document.getElementById('btnDelete').style.display = '';
 }
 
 function closeModal() {
@@ -413,12 +470,20 @@ function closeModal() {
 
 function calcBalance() {
   const data = getData();
-  const lastBal = data.length ? data[data.length-1].balance : 0;
+  let prevBal = 0;
+  if (editingId !== null) {
+    // For editing: prev balance is the balance of the record before this one
+    const idx = data.findIndex(d => d.id === editingId);
+    prevBal = idx > 0 ? data[idx - 1].balance : 0;
+  } else {
+    // For new: prev balance is the last record's balance
+    prevBal = data.length ? data[data.length - 1].balance : 0;
+  }
   const type = document.getElementById('formType').value;
   const amount = parseFloat(document.getElementById('formAmount').value) || 0;
   let newBal;
-  if (type === '收入') newBal = lastBal + amount;
-  else newBal = lastBal - amount;
+  if (type === '收入') newBal = prevBal + amount;
+  else newBal = prevBal - amount;
   document.getElementById('formBalance').value = `¥${newBal < 0 ? '-' : ''}${fmt(newBal)}`;
   return newBal;
 }
@@ -437,20 +502,61 @@ function submitForm() {
   if (!desc) { alert('请输入说明'); return; }
   if (!amount || amount <= 0) { alert('请输入有效金额'); return; }
   
-  const newBal = calcBalance();
-  const data = getData();
-  const newId = data.length ? Math.max(...data.map(d=>d.id)) + 1 : 1;
+  let data = getData();
   
-  const record = { id: newId, type, desc, amount, date, balance: Math.round(newBal*100)/100 };
-  if (currentModule === 'hand') record.person = person || '/';
-  
-  data.push(record);
-  setData(data);
+  if (editingId !== null) {
+    // Edit mode: update existing record
+    const idx = data.findIndex(d => d.id === editingId);
+    if (idx === -1) return;
+    data[idx].type = type;
+    data[idx].date = date;
+    data[idx].desc = desc;
+    data[idx].amount = amount;
+    if (currentModule === 'hand') data[idx].person = person || '/';
+    recalcBalances(data, idx);
+    setData(data);
+  } else {
+    // New record mode
+    const newId = data.length ? Math.max(...data.map(d=>d.id)) + 1 : 1;
+    const record = { id: newId, type, desc, amount, date, balance: 0 };
+    if (currentModule === 'hand') record.person = person || '/';
+    data.push(record);
+    recalcBalances(data, data.length - 1);
+    setData(data);
+  }
   
   closeModal();
   currentFilter = 'all';
   currentPage = 1;
   renderAll();
+}
+
+function deleteRecord() {
+  if (editingId === null) return;
+  if (!confirm('确定删除这条记录？删除后余额将自动重算。')) return;
+  
+  let data = getData();
+  const idx = data.findIndex(d => d.id === editingId);
+  if (idx === -1) return;
+  
+  data.splice(idx, 1);
+  // Recalculate all balances from the deleted position onward
+  if (data.length > 0) recalcBalances(data, Math.min(idx, data.length - 1));
+  setData(data);
+  
+  closeModal();
+  renderAll();
+}
+
+function recalcBalances(data, fromIdx) {
+  for (let i = fromIdx; i < data.length; i++) {
+    const prevBal = i > 0 ? data[i-1].balance : 0;
+    if (data[i].type === '收入') {
+      data[i].balance = Math.round((prevBal + data[i].amount) * 100) / 100;
+    } else {
+      data[i].balance = Math.round((prevBal - data[i].amount) * 100) / 100;
+    }
+  }
 }
 
 document.getElementById('modalOverlay').addEventListener('click', e => {
