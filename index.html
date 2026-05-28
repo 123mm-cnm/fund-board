@@ -12,6 +12,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Ro
 .header-left{display:flex;align-items:baseline;gap:12px}
 .header h1{font-size:20px;font-weight:600;color:#1a1a1a}
 .header .sub{font-size:13px;color:#999}
+.total-hero{background:linear-gradient(135deg,#534AB7 0%,#7c6dd8 100%);border-radius:16px;padding:28px 32px 24px;margin-bottom:24px;color:#fff;position:relative;overflow:hidden}
+.total-hero::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.06)}
+.total-hero::after{content:'';position:absolute;bottom:-40px;left:40%;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.03)}
+.total-hero .total-label{font-size:13px;font-weight:500;opacity:.85;margin-bottom:8px;letter-spacing:.5px}
+.total-hero .total-value{font-size:36px;font-weight:700;letter-spacing:-.5px;margin-bottom:18px}
+.total-breakdown{display:flex;gap:0;align-items:center}
+.total-sub{flex:1;text-align:center;padding:12px 0}
+.total-sub .sub-label{font-size:11px;opacity:.7;margin-bottom:4px}
+.total-sub .sub-value{font-size:18px;font-weight:600}
+.total-plus{font-size:16px;opacity:.5;font-weight:300;flex-shrink:0;padding:0 4px}
+.total-eq{font-size:11px;opacity:.5;text-align:center;margin-bottom:6px;letter-spacing:1px}
 .module-tabs{display:flex;gap:6px;margin-bottom:24px;width:fit-content}
 .module-tab{padding:10px 22px;font-size:13px;color:#888;cursor:pointer;border-radius:10px;transition:all .2s;font-weight:500;user-select:none;background:#fff;border:0.5px solid rgba(0,0,0,.06);position:relative}
 .module-tab.active{background:#534AB7;color:#fff;border-color:#534AB7}
@@ -143,6 +154,8 @@ th.r,td.r{text-align:right}
       </div>
     </div>
   </div>
+
+  <div class="total-hero" id="totalHero"></div>
 
   <div class="module-tabs" id="moduleTabs">
     <div class="module-tab active" data-module="hand">中心小金罐<span class="tab-badge">日常收支</span></div>
@@ -317,6 +330,29 @@ function fmtDate(d) {
 }
 
 // ===== RENDER =====
+function renderTotalHero() {
+  const handBal = handData.length ? handData[handData.length-1].balance : 0;
+  const sysBal = sysData.length ? sysData[sysData.length-1].balance : 0;
+  const total = Math.round((handBal + sysBal) * 100) / 100;
+  
+  document.getElementById('totalHero').innerHTML = `
+    <div class="total-label">中心可用经费总额</div>
+    <div class="total-value">&yen;${total<0?'-':''}${fmt(total)}</div>
+    <div class="total-eq">= 小金罐（已取出） + 系统账户（待取出）</div>
+    <div class="total-breakdown">
+      <div class="total-sub">
+        <div class="sub-label">中心小金罐</div>
+        <div class="sub-value">&yen;${handBal<0?'-':''}${fmt(handBal)}</div>
+      </div>
+      <div class="total-plus">+</div>
+      <div class="total-sub">
+        <div class="sub-label">系统账户</div>
+        <div class="sub-value">&yen;${sysBal<0?'-':''}${fmt(sysBal)}</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderMetrics() {
   const data = getData();
   const totalIn = data.filter(d=>d.type==='收入').reduce((s,d)=>s+d.amount,0);
@@ -440,6 +476,7 @@ function renderTable() {
 }
 
 function renderAll() {
+  renderTotalHero();
   renderMetrics();
   renderFilterTabs();
   renderTableHead();
